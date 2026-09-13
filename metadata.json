@@ -1,0 +1,8 @@
+{
+  "name": "Campus Info",
+  "description": "A campus study and event management hub with an AI study companion, integrated Google Calendar schedules, daily task to-do list, integrated Gmail inbox & messaging, WhatsApp study squad circles with AI message summarizer, Notion workspace binder & notes, curated resources, and study material organizers.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
