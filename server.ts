@@ -224,6 +224,64 @@ app.post("/api/notion/pages", async (req, res) => {
   }
 });
 
+// Helper to extract active poll summaries and vote counts from chat messages
+function extractPollSummaries(messages: any[]): any[] {
+  const polls: any[] = [];
+  for (const m of messages) {
+    if (m.poll && m.poll.question && Array.isArray(m.poll.options)) {
+      const p = m.poll;
+      let yesVotes = 0;
+      let noVotes = 0;
+      const totalVotes =
+        typeof p.totalVotes === 'number'
+          ? p.totalVotes
+          : p.options.reduce((sum: number, o: any) => sum + (Number(o.votes) || 0), 0);
+
+      const breakdown = p.options.map((opt: any) => {
+        const votes = Number(opt.votes) || 0;
+        const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+        const optLower = String(opt.text || '').toLowerCase().trim();
+        if (optLower === 'yes' || optLower.startsWith('yes ') || optLower.startsWith('yes(') || optLower.startsWith('yes,')) {
+          yesVotes += votes;
+        } else if (optLower === 'no' || optLower.startsWith('no ') || optLower.startsWith('no(') || optLower.startsWith('no,')) {
+          noVotes += votes;
+        }
+        return {
+          option: opt.text,
+          votes,
+          percentage: pct,
+          voters: Array.isArray(opt.voters) ? opt.voters : [],
+        };
+      });
+
+      // Consensus summary
+      let consensus = '';
+      if (yesVotes > noVotes) {
+        consensus = `Majority voted YES: ${yesVotes} said Yes vs ${noVotes} said No (${totalVotes > 0 ? Math.round((yesVotes / totalVotes) * 100) : 0}% Yes). Approved by the group.`;
+      } else if (noVotes > yesVotes) {
+        consensus = `Majority voted NO: ${noVotes} said No vs ${yesVotes} said Yes (${totalVotes > 0 ? Math.round((noVotes / totalVotes) * 100) : 0}% No). Declined by the group.`;
+      } else if (yesVotes === noVotes && totalVotes > 0) {
+        consensus = `Split tie: ${yesVotes} said Yes and ${noVotes} said No out of ${totalVotes} total votes.`;
+      } else {
+        consensus = `Poll active with ${totalVotes} total votes cast.`;
+      }
+
+      polls.push({
+        id: p.id || `poll-${polls.length + 1}`,
+        question: p.question,
+        yesVotes,
+        noVotes,
+        totalVotes,
+        breakdown,
+        status: p.isClosed ? 'closed' : 'active',
+        consensus,
+        userVote: p.userVotedOptionId,
+      });
+    }
+  }
+  return polls;
+}
+
 // WhatsApp AI Summarization Endpoint
 app.post("/api/whatsapp/summarize", async (req, res) => {
   const { chatName, messages = [] } = req.body;
@@ -233,10 +291,13 @@ app.post("/api/whatsapp/summarize", async (req, res) => {
     return;
   }
 
+  // Pre-extract ground truth polls from messages
+  const groundTruthPolls = extractPollSummaries(messages);
+
   const ai = getGenAI();
   if (!ai) {
     // Graceful fallback summary if Gemini API key is not configured
-    let overview = `Summary of ${messages.length} messages in "${chatName}". Key course updates, deadlines, and laboratory session schedules reviewed.`;
+    let overview = `Summary of ${messages.length} messages in "${chatName}". Key course updates, deadlines, and active group discussions reviewed.`;
     let urgentAlerts = [
       "Check group announcements regarding tomorrow's deadline",
       "Confirm your attendance for the scheduled room"
@@ -250,7 +311,7 @@ app.post("/api/whatsapp/summarize", async (req, res) => {
     ];
 
     if (chatName.includes("BioChem") || chatName.includes("CHEM-204")) {
-      overview = `Professor Vance announced Lab #3 safety requirements and rescheduled the Section B Makeup Lab to Wednesday 3:00 PM - 4:30 PM in Sci-Lab 201.`;
+      overview = `Professor Vance announced Lab #3 safety requirements and rescheduled the Section B Makeup Lab to Wednesday 3:00 PM - 4:30 PM in Sci-Lab 201. Active attendance poll is underway.`;
       urgentAlerts = [
         "🚨 URGENT: CHEM-204 Makeup Lab rescheduled to Wednesday 3:00 PM - 4:30 PM!",
         "Safety contracts must be signed before Thursday 8:00 AM sharp to enter the lab"
@@ -286,6 +347,7 @@ app.post("/api/whatsapp/summarize", async (req, res) => {
       urgentAlerts,
       actionItems,
       deadlines,
+      activePolls: groundTruthPolls,
       generatedAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
     });
     return;
@@ -293,11 +355,19 @@ app.post("/api/whatsapp/summarize", async (req, res) => {
 
   try {
     const formattedTranscript = messages
-      .map((m: any) => `[${m.timestamp}] ${m.senderName}: ${m.text}`)
+      .map((m: any) => {
+        let line = `[${m.timestamp}] ${m.senderName}: ${m.text}`;
+        if (m.poll) {
+          line += `\n  [POLL]: "${m.poll.question}" (Created by ${m.poll.creatorName || m.senderName})\n  Options & Votes:\n` +
+            m.poll.options.map((o: any) => `    • ${o.text}: ${o.votes} votes (${(o.voters || []).join(', ') || 'No names'})`).join('\n') +
+            `\n  Total Votes: ${m.poll.totalVotes}`;
+        }
+        return line;
+      })
       .join("\n");
 
     const prompt = `You are a helpful college campus academic assistant.
-Analyze this WhatsApp chat transcript from "${chatName}" and identify all important information for a student, paying special attention to class schedules, lecture times, labs, and any possible timing conflicts.
+Analyze this WhatsApp chat transcript from "${chatName}" and identify all important information for a student, paying special attention to class schedules, lecture times, labs, schedule conflicts, and any active POLLS underway in the group.
 
 TRANSCRIPT:
 ${formattedTranscript}
@@ -307,13 +377,35 @@ Provide a structured JSON output with:
 2. "urgentAlerts": Array of high-priority urgent announcements, professor messages, rescheduled classes, or schedule shifts (max 3).
 3. "actionItems": Array of concrete tasks, homework, things students need to submit or do (max 4).
 4. "deadlines": Array of specific dates/times mentioned for exams, lab reports, assignments, or class sessions (max 4).
+5. "activePolls": Array of all polls mentioned or taking place in the chat. For each poll, extract:
+   - "question": string (the exact poll question)
+   - "yesVotes": number (exact count of people who voted Yes or in favor)
+   - "noVotes": number (exact count of people who voted No or against)
+   - "totalVotes": number (total votes cast)
+   - "breakdown": array of objects { "option": string, "votes": number, "percentage": number }
+   - "status": "active" or "closed"
+   - "consensus": string (a crystal-clear statement specifying how many people said yes, how many said no, and the group outcome e.g. "3 people said Yes, 1 person said No (75% Yes). Majority approved.")
+If no polls are present in the chat, return an empty array [] for "activePolls".
 
 Respond strictly with valid JSON conforming to:
 {
   "overview": "...",
   "urgentAlerts": ["..."],
   "actionItems": ["..."],
-  "deadlines": ["..."]
+  "deadlines": ["..."],
+  "activePolls": [
+    {
+      "question": "...",
+      "yesVotes": 0,
+      "noVotes": 0,
+      "totalVotes": 0,
+      "breakdown": [
+        { "option": "Yes", "votes": 0, "percentage": 0 }
+      ],
+      "status": "active",
+      "consensus": "..."
+    }
+  ]
 }`;
 
     let response;
@@ -339,11 +431,33 @@ Respond strictly with valid JSON conforming to:
     const outputText = response.text || "{}";
     const parsed = JSON.parse(outputText);
 
+    // Merge ground truth polls to guarantee 100% accuracy of Yes/No counts and voter lists
+    let combinedPolls = Array.isArray(parsed.activePolls) && parsed.activePolls.length > 0
+      ? parsed.activePolls
+      : groundTruthPolls;
+
+    if (groundTruthPolls.length > 0) {
+      // If messages contained structured poll data, ensure accurate numbers
+      combinedPolls = groundTruthPolls.map((gt) => {
+        const aiMatch = Array.isArray(parsed.activePolls)
+          ? parsed.activePolls.find((p: any) =>
+              p.question?.toLowerCase().includes(gt.question.toLowerCase().slice(0, 15)) ||
+              gt.question.toLowerCase().includes((p.question || '').toLowerCase().slice(0, 15))
+            )
+          : null;
+        return {
+          ...gt,
+          consensus: aiMatch?.consensus || gt.consensus,
+        };
+      });
+    }
+
     res.json({
       overview: parsed.overview || `Summary of key updates in ${chatName}.`,
       urgentAlerts: parsed.urgentAlerts || [],
       actionItems: parsed.actionItems || [],
       deadlines: parsed.deadlines || [],
+      activePolls: combinedPolls,
       generatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
   } catch (error: any) {
@@ -354,6 +468,7 @@ Respond strictly with valid JSON conforming to:
       urgentAlerts: ["Exam review room updated", "Lab assignment due soon"],
       actionItems: ["Bring printed safety contract", "Finish mechanism problems"],
       deadlines: ["Thursday 11:59 PM"],
+      activePolls: groundTruthPolls,
       generatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     });
   }

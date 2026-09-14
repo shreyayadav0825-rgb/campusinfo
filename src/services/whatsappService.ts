@@ -29,6 +29,7 @@ export async function summarizeWhatsAppChat(
     urgentAlerts: data.urgentAlerts || [],
     actionItems: data.actionItems || [],
     deadlines: data.deadlines || [],
+    activePolls: data.activePolls || [],
     generatedAt: data.generatedAt || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
   };
 }

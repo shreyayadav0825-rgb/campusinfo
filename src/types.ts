@@ -1,5 +1,23 @@
 export type ActiveTab = 'chat' | 'calendar' | 'todo' | 'gmail' | 'whatsapp' | 'notion' | 'resources' | 'study';
 
+export interface WhatsAppPollOption {
+  id: string;
+  text: string;
+  votes: number;
+  voters?: string[];
+}
+
+export interface WhatsAppPoll {
+  id: string;
+  question: string;
+  options: WhatsAppPollOption[];
+  totalVotes: number;
+  isClosed?: boolean;
+  createdAt?: string;
+  creatorName?: string;
+  userVotedOptionId?: string;
+}
+
 export interface WhatsAppMessage {
   id: string;
   sender: string;
@@ -11,6 +29,7 @@ export interface WhatsAppMessage {
   priority?: 'urgent' | 'action_required' | 'info';
   deadlineMentioned?: string;
   actionItem?: string;
+  poll?: WhatsAppPoll;
 }
 
 export type WhatsAppGroupCategory = 'class' | 'club' | 'general';
@@ -56,6 +75,18 @@ export interface ClassClash {
   resolved?: boolean;
 }
 
+export interface PollSummaryItem {
+  id?: string;
+  question: string;
+  yesVotes: number;
+  noVotes: number;
+  totalVotes: number;
+  breakdown: { option: string; votes: number; percentage: number; voters?: string[] }[];
+  status: 'active' | 'closed';
+  consensus: string;
+  userVote?: string;
+}
+
 export interface WhatsAppSummary {
   chatId: string;
   overview: string;
@@ -64,6 +95,7 @@ export interface WhatsAppSummary {
   deadlines: string[];
   generatedAt: string;
   clashesDetected?: ClassClash[];
+  activePolls?: PollSummaryItem[];
 }
 
 export interface NotionPageItem {

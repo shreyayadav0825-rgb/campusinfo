@@ -7,9 +7,11 @@ import {
   TodoItem,
   CalendarEvent,
   ClassClash,
+  PollSummaryItem,
+  WhatsAppPoll,
 } from '../types';
 import { summarizeWhatsAppChat, parseWhatsAppExport } from '../services/whatsappService';
-import { playCutePop, playRedAlertSound, stopRedAlertSound } from '../utils/sound';
+import { playCutePop, playRedAlertSound, stopRedAlertSound, playCuteChime } from '../utils/sound';
 import {
   MessageSquare,
   Sparkles,
@@ -39,8 +41,83 @@ import {
   AlertOctagon,
   Volume2,
   BellOff,
+  BarChart2,
+  ThumbsUp,
+  ThumbsDown,
+  Check,
+  Vote,
+  HelpCircle,
 } from 'lucide-react';
 import whatsappIcon from '../assets/images/whatsapp_icon_1789302930853.jpg';
+
+// Helper to compute poll metrics and Yes/No counts from chat messages
+function extractPollsFromChat(chat: WhatsAppChat): PollSummaryItem[] {
+  const polls: PollSummaryItem[] = [];
+  for (const m of chat.messages) {
+    if (m.poll && m.poll.question && Array.isArray(m.poll.options)) {
+      const p = m.poll;
+      let yesVotes = 0;
+      let noVotes = 0;
+      const totalVotes =
+        typeof p.totalVotes === 'number'
+          ? p.totalVotes
+          : p.options.reduce((sum, o) => sum + (o.votes || 0), 0);
+
+      const breakdown = p.options.map((opt) => {
+        const votes = opt.votes || 0;
+        const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0;
+        const optLower = opt.text.toLowerCase().trim();
+        if (
+          optLower === 'yes' ||
+          optLower.startsWith('yes ') ||
+          optLower.startsWith('yes(') ||
+          optLower.startsWith('yes,')
+        ) {
+          yesVotes += votes;
+        } else if (
+          optLower === 'no' ||
+          optLower.startsWith('no ') ||
+          optLower.startsWith('no(') ||
+          optLower.startsWith('no,')
+        ) {
+          noVotes += votes;
+        }
+        return {
+          option: opt.text,
+          votes,
+          percentage: pct,
+          voters: opt.voters || [],
+        };
+      });
+
+      let consensus = '';
+      if (yesVotes > noVotes) {
+        const yesPct = totalVotes > 0 ? Math.round((yesVotes / totalVotes) * 100) : 0;
+        consensus = `Majority voted YES (${yesVotes} Yes vs ${noVotes} No - ${yesPct}% in favor). Approved by the group.`;
+      } else if (noVotes > yesVotes) {
+        const noPct = totalVotes > 0 ? Math.round((noVotes / totalVotes) * 100) : 0;
+        consensus = `Majority voted NO (${noVotes} No vs ${yesVotes} Yes - ${noPct}% against). Declined by the group.`;
+      } else if (yesVotes === noVotes && totalVotes > 0) {
+        consensus = `Split tie: ${yesVotes} said Yes and ${noVotes} said No out of ${totalVotes} total votes.`;
+      } else {
+        consensus = `Poll active with ${totalVotes} total votes cast.`;
+      }
+
+      polls.push({
+        id: p.id,
+        question: p.question,
+        yesVotes,
+        noVotes,
+        totalVotes,
+        breakdown,
+        status: p.isClosed ? 'closed' : 'active',
+        consensus,
+        userVote: p.userVotedOptionId,
+      });
+    }
+  }
+  return polls;
+}
 
 interface WhatsAppViewProps {
   initialChats: WhatsAppChat[];
@@ -67,7 +144,26 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
 }) => {
   const [chats, setChats] = useState<WhatsAppChat[]>(() => {
     const saved = localStorage.getItem('aesthetic_whatsapp_chats');
-    return saved ? JSON.parse(saved) : initialChats;
+    if (!saved) return initialChats;
+    try {
+      const parsed: WhatsAppChat[] = JSON.parse(saved);
+      // Migrate initial polls into saved chats if not already present
+      return parsed.map((c) => {
+        const initChat = initialChats.find((ic) => ic.id === c.id);
+        if (!initChat) return c;
+        const hasPoll = c.messages.some((m) => m.poll);
+        const initPollMsg = initChat.messages.find((m) => m.poll);
+        if (!hasPoll && initPollMsg) {
+          return {
+            ...c,
+            messages: [...c.messages, initPollMsg],
+          };
+        }
+        return c;
+      });
+    } catch {
+      return initialChats;
+    }
   });
 
   const [selectedChatId, setSelectedChatId] = useState<string>(
@@ -86,6 +182,13 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
   const [newMessageText, setNewMessageText] = useState('');
   const [copiedAction, setCopiedAction] = useState<string | null>(null);
 
+  // Create Poll Modal state
+  const [showCreatePollModal, setShowCreatePollModal] = useState(false);
+  const [pollQuestion, setPollQuestion] = useState('');
+  const [pollOption1, setPollOption1] = useState('Yes');
+  const [pollOption2, setPollOption2] = useState('No');
+  const [pollOption3, setPollOption3] = useState('');
+
   // Add Group Modal state
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [groupName, setGroupName] = useState('');
@@ -101,6 +204,14 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
 
   const selectedChat = chats.find((c) => c.id === selectedChatId) || chats[0];
   const activeSummary = selectedChat ? summaries[selectedChat.id] : null;
+
+  // Real-time effective polls (guarantees accurate counts even before or after re-summarizing)
+  const effectivePolls: PollSummaryItem[] =
+    activeSummary?.activePolls && activeSummary.activePolls.length > 0
+      ? activeSummary.activePolls
+      : selectedChat
+      ? extractPollsFromChat(selectedChat)
+      : [];
 
   // Active clashes involving WhatsApp
   const activeClashes = clashes.filter((c) => !c.resolved);
@@ -137,19 +248,29 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
 
     try {
       const summary = await summarizeWhatsAppChat(chatToSummarize);
+      // Ensure polls are attached
+      const polls = summary.activePolls && summary.activePolls.length > 0
+        ? summary.activePolls
+        : extractPollsFromChat(chatToSummarize);
+
       setSummaries((prev) => ({
         ...prev,
-        [chatToSummarize.id]: summary,
+        [chatToSummarize.id]: {
+          ...summary,
+          activePolls: polls,
+        },
       }));
     } catch (err: any) {
       console.warn('AI summary error, creating structured fallback:', err);
-      // Fallback extraction of important messages
+      // Fallback extraction of important messages & polls
       const urgentMsgs = chatToSummarize.messages.filter(
         (m) => m.isImportant || m.priority === 'urgent'
       );
+      const clientPolls = extractPollsFromChat(chatToSummarize);
+
       const fallbackSummary: WhatsAppSummary = {
         chatId: chatToSummarize.id,
-        overview: `Summary of discussion in ${chatToSummarize.chatName}. Members discussed essential notifications, schedule updates, and upcoming deliverables.`,
+        overview: `Summary of discussion in ${chatToSummarize.chatName}. Key announcements, meeting times, and group votes reviewed.`,
         urgentAlerts:
           urgentMsgs.length > 0
             ? urgentMsgs.slice(0, 2).map((m) => m.text)
@@ -159,6 +280,7 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
           'Review notes and lecture/event slides',
         ],
         deadlines: ['Upcoming assignment or committee milestone this week'],
+        activePolls: clientPolls,
         generatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setSummaries((prev) => ({
@@ -168,6 +290,188 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
     } finally {
       setSummarizing(false);
     }
+  };
+
+  // Handle interactive voting on a poll
+  const handleVotePoll = (messageId: string, optionId: string) => {
+    playCutePop();
+    if (!selectedChat) return;
+
+    let updatedSelectedChat: WhatsAppChat | null = null;
+
+    setChats((prevChats) => {
+      const updated = prevChats.map((chat) => {
+        if (chat.id !== selectedChat.id) return chat;
+
+        const updatedMessages = chat.messages.map((msg) => {
+          if (msg.id !== messageId || !msg.poll) return msg;
+
+          const currentVotedId = msg.poll.userVotedOptionId;
+          if (currentVotedId === optionId) return msg; // Already selected
+
+          const updatedOptions = msg.poll.options.map((opt) => {
+            let newVotes = opt.votes;
+            let newVoters = [...(opt.voters || [])];
+
+            if (opt.id === currentVotedId) {
+              newVotes = Math.max(0, newVotes - 1);
+              newVoters = newVoters.filter((v) => !v.includes('You'));
+            } else if (opt.id === optionId) {
+              newVotes = newVotes + 1;
+              if (!newVoters.some((v) => v.includes('You'))) {
+                newVoters.push('You');
+              }
+            }
+
+            return {
+              ...opt,
+              votes: newVotes,
+              voters: newVoters,
+            };
+          });
+
+          const newTotalVotes = updatedOptions.reduce((sum, o) => sum + o.votes, 0);
+
+          return {
+            ...msg,
+            poll: {
+              ...msg.poll,
+              options: updatedOptions,
+              totalVotes: newTotalVotes,
+              userVotedOptionId: optionId,
+            },
+          };
+        });
+
+        const newChat = {
+          ...chat,
+          messages: updatedMessages,
+        };
+        updatedSelectedChat = newChat;
+        return newChat;
+      });
+
+      return updated;
+    });
+
+    // Immediately update activeSummary with the recalculated poll metrics
+    setSummaries((prevSummaries) => {
+      const current = prevSummaries[selectedChat.id];
+      if (!current && !updatedSelectedChat) return prevSummaries;
+
+      // Extract fresh poll metrics
+      const freshChat = updatedSelectedChat || selectedChat;
+      const freshPolls = extractPollsFromChat(freshChat);
+
+      return {
+        ...prevSummaries,
+        [selectedChat.id]: {
+          ...(current || {
+            chatId: selectedChat.id,
+            overview: `Summary of discussion in ${selectedChat.chatName}.`,
+            urgentAlerts: [],
+            actionItems: [],
+            deadlines: [],
+            generatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          }),
+          activePolls: freshPolls,
+        },
+      };
+    });
+  };
+
+  // Handle creating a new poll in the active chat
+  const handleCreatePoll = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!pollQuestion.trim() || !pollOption1.trim() || !pollOption2.trim() || !selectedChat) return;
+
+    playCuteChime();
+    const options = [
+      {
+        id: `opt-1-${Date.now()}`,
+        text: pollOption1.trim(),
+        votes: 0,
+        voters: [],
+      },
+      {
+        id: `opt-2-${Date.now()}`,
+        text: pollOption2.trim(),
+        votes: 0,
+        voters: [],
+      },
+    ];
+
+    if (pollOption3.trim()) {
+      options.push({
+        id: `opt-3-${Date.now()}`,
+        text: pollOption3.trim(),
+        votes: 0,
+        voters: [],
+      });
+    }
+
+    const newPoll: WhatsAppPoll = {
+      id: `poll-${Date.now()}`,
+      question: pollQuestion.trim(),
+      creatorName: 'You',
+      options,
+      totalVotes: 0,
+      isClosed: false,
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    const newPollMessage: WhatsAppMessage = {
+      id: `msg-poll-${Date.now()}`,
+      sender: 'me',
+      senderName: 'You',
+      text: `📊 Poll: ${pollQuestion.trim()}`,
+      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      isImportant: true,
+      priority: 'action_required',
+      poll: newPoll,
+    };
+
+    const updatedChatMessages = [...selectedChat.messages, newPollMessage];
+
+    setChats((prev) =>
+      prev.map((c) =>
+        c.id === selectedChat.id
+          ? {
+              ...c,
+              lastMessageTime: 'Just now',
+              messages: updatedChatMessages,
+            }
+          : c
+      )
+    );
+
+    // Update active summary immediately
+    const freshPolls = extractPollsFromChat({
+      ...selectedChat,
+      messages: updatedChatMessages,
+    });
+
+    setSummaries((prev) => ({
+      ...prev,
+      [selectedChat.id]: {
+        ...(prev[selectedChat.id] || {
+          chatId: selectedChat.id,
+          overview: `Summary of discussion in ${selectedChat.chatName}.`,
+          urgentAlerts: [],
+          actionItems: [],
+          deadlines: [],
+          generatedAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        }),
+        activePolls: freshPolls,
+      },
+    }));
+
+    // Reset poll modal
+    setPollQuestion('');
+    setPollOption1('Yes');
+    setPollOption2('No');
+    setPollOption3('');
+    setShowCreatePollModal(false);
   };
 
   const handleSendMessage = (e: React.FormEvent) => {
