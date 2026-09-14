@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Flashcard, StudyNote } from '../types';
 import { playCutePop, playCuteChime, playCardFlip } from '../utils/sound';
 import { RotateCw, CheckCircle2, XCircle, Plus, ChevronLeft, ChevronRight, BookOpen, Sparkles, Tag, StickyNote, HelpCircle } from 'lucide-react';
+import studyMaterialIcon from '../assets/images/study_material_book_1789391807999.jpg';
 
 interface StudyMaterialViewProps {
   flashcards: Flashcard[];
@@ -115,6 +116,37 @@ export const StudyMaterialView: React.FC<StudyMaterialViewProps> = ({
 
   return (
     <div className="space-y-6">
+      {/* Top Banner with Floral Open Book */}
+      <div className="bg-[#faf5ff] border border-[#e9d5ff] rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-2xs">
+        <div className="flex items-center space-x-3.5">
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-xs ring-2 ring-[#c084fc] bg-white flex items-center justify-center p-0.5 shrink-0">
+            <img
+              src={studyMaterialIcon}
+              alt="Study Material Floral Book"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-xl"
+            />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <h3 className="font-cute font-bold text-sm sm:text-base text-[#6b21a8]">
+                Study Material & Flashcard Haven
+              </h3>
+              <span className="bg-[#f3e8ff] text-[#7e22ce] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#d8b4fe]">
+                {masteryPercentage}% Mastered ({masteredCount}/{flashcards.length})
+              </span>
+            </div>
+            <p className="text-xs text-[#7e22ce] mt-0.5">
+              Spaced repetition cards, lecture notes, and active recall summaries
+            </p>
+          </div>
+        </div>
+
+        <div className="flex items-center space-x-2 text-xs font-cute text-[#6b21a8] bg-white/80 px-3 py-1.5 rounded-xl border border-[#e9d5ff]">
+          <span>🌸 Cottagecore Study Desk</span>
+        </div>
+      </div>
+
       {/* Sub-tab Navigation (Flashcards vs Study Notes) */}
       <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#ebdcd0]">
         <div className="flex items-center space-x-2">

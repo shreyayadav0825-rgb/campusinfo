@@ -9,6 +9,7 @@ import notionIcon from '../assets/images/notion_icon_1789302061804.jpg';
 import whatsappIcon from '../assets/images/whatsapp_icon_1789302930853.jpg';
 import booksResourcesIcon from '../assets/images/books_resources_icon_1789391402505.jpg';
 import aiRobotIcon from '../assets/images/ai_robot_avatar_icon_1789391582140.jpg';
+import studyMaterialIcon from '../assets/images/study_material_book_1789391807999.jpg';
 
 interface AestheticNavProps {
   activeTab: ActiveTab;
@@ -216,11 +217,16 @@ export const AestheticNav: React.FC<AestheticNavProps> = ({
       accentColor: '#8b5cf6',
       icon: (
         <div className="relative flex items-center justify-center">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#7c3aed] to-[#c4b5fd] flex items-center justify-center text-white shadow-sm ring-2 ring-[#ede9fe]">
-            <BookOpen className="w-5 h-5 drop-shadow-xs" />
+          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-sm ring-2 ring-[#ddd6fe] bg-[#f5f3ff] flex items-center justify-center p-0.5">
+            <img
+              src={studyMaterialIcon}
+              alt="Study Material Floral Book Icon"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-xl"
+            />
           </div>
-          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#6366f1] text-[9px] font-bold text-white shadow-xs">
-            📝
+          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#8b5cf6] text-[9px] font-bold text-white shadow-xs">
+            🌸
           </span>
         </div>
       ),

@@ -32,6 +32,7 @@ import notionIcon from './assets/images/notion_icon_1789302061804.jpg';
 import whatsappIcon from './assets/images/whatsapp_icon_1789302930853.jpg';
 import booksResourcesIcon from './assets/images/books_resources_icon_1789391402505.jpg';
 import aiRobotIcon from './assets/images/ai_robot_avatar_icon_1789391582140.jpg';
+import studyMaterialIcon from './assets/images/study_material_book_1789391807999.jpg';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState<ActiveTab>('whatsapp');
@@ -405,7 +406,16 @@ Student ID: #2026-CAMPUS`,
           </span>
         );
       case 'study':
-        return '🎴';
+        return (
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#faf5ff] border border-[#ddd6fe] p-0.5 -mt-1 shadow-2xs">
+            <img
+              src={studyMaterialIcon}
+              alt="Study Material"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-xs"
+            />
+          </span>
+        );
     }
   };
 
