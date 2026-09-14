@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ResourceItem } from '../types';
 import { playCutePop, playCuteChime } from '../utils/sound';
 import { ExternalLink, Star, Plus, Search, BookOpen, Bookmark, GraduationCap, Cpu, FileSpreadsheet, Volume2, VolumeX, Play, Pause, Headphones } from 'lucide-react';
+import booksResourcesIcon from '../assets/images/books_resources_icon_1789391402505.jpg';
 
 interface ResourcesViewProps {
   resources: ResourceItem[];
@@ -192,22 +193,27 @@ export const ResourcesView: React.FC<ResourcesViewProps> = ({
   return (
     <div className="space-y-6">
       {/* Top Banner: Ambient Study Player & Quick Add */}
-      <div className="bg-[#f0fdf4] border border-[#bbf7d0] rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-2xs">
+      <div className="bg-[#f0f9ff] border border-[#bae6fd] rounded-2xl p-4 sm:p-5 flex flex-wrap items-center justify-between gap-4 shadow-2xs">
         <div className="flex items-center space-x-3.5">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-[#059669] to-[#34d399] flex items-center justify-center text-white shadow-xs">
-            <Headphones className="w-6 h-6 drop-shadow-xs" />
+          <div className="w-12 h-12 rounded-2xl overflow-hidden shadow-xs ring-2 ring-[#7dd3fc] bg-[#e0f2fe] flex items-center justify-center p-0.5 shrink-0">
+            <img
+              src={booksResourcesIcon}
+              alt="Books and Resources"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-xl"
+            />
           </div>
           <div>
             <div className="flex items-center space-x-2">
-              <h3 className="font-cute font-bold text-sm sm:text-base text-[#065f46]">
-                Aesthetic Ambient Study Player
+              <h3 className="font-cute font-bold text-sm sm:text-base text-[#0369a1]">
+                Campus Resources & Study Hub
               </h3>
-              <span className="bg-[#dcfce7] text-[#15803d] text-[10px] font-bold px-2 py-0.5 rounded-full">
-                {isPlayingAudio ? 'Playing' : 'Paused'}
+              <span className="bg-[#e0f2fe] text-[#0284c7] text-[10px] font-bold px-2 py-0.5 rounded-full border border-[#bae6fd]">
+                {isPlayingAudio ? 'Ambient Playing' : 'I ❤️ Books'}
               </span>
             </div>
-            <p className="text-xs text-[#166534] mt-0.5">
-              Calming procedural soundscapes to help you get into deep flow
+            <p className="text-xs text-[#0284c7] mt-0.5">
+              Academic links, cheat sheets, and calming soundscapes for deep focus
             </p>
           </div>
         </div>

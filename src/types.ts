@@ -29,6 +29,33 @@ export interface WhatsAppChat {
   messages: WhatsAppMessage[];
 }
 
+export interface ScheduledClass {
+  id: string;
+  source: 'whatsapp_summary' | 'whatsapp_chat' | 'gmail' | 'calendar';
+  sourceTitle: string; // e.g., "BioChem 204 Lab Squad" or "Prof. Vance (Gmail)"
+  className: string; // e.g., "CHEM-204 Makeup Lab"
+  courseCode?: string;
+  instructorOrSender?: string;
+  dayOrDate: string; // e.g. "Wednesday" or "2026-09-16"
+  startTime: string; // e.g. "03:00 PM"
+  endTime: string; // e.g. "04:30 PM"
+  locationOrRoom?: string; // e.g. "Sci-Lab 201"
+  snippet: string; // Context text
+  chatId?: string;
+  emailId?: string;
+}
+
+export interface ClassClash {
+  id: string;
+  classA: ScheduledClass;
+  classB: ScheduledClass;
+  overlapDescription: string;
+  severity: 'critical' | 'high';
+  detectedAt: string;
+  source: 'whatsapp' | 'gmail' | 'cross_service';
+  resolved?: boolean;
+}
+
 export interface WhatsAppSummary {
   chatId: string;
   overview: string;
@@ -36,6 +63,7 @@ export interface WhatsAppSummary {
   actionItems: string[];
   deadlines: string[];
   generatedAt: string;
+  clashesDetected?: ClassClash[];
 }
 
 export interface NotionPageItem {

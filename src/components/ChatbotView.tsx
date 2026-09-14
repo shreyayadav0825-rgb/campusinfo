@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Bot, Sparkles, Copy, Check, BookPlus, RefreshCw, Lightbulb, Coffee, BookOpen } from 'lucide-react';
 import { ChatMessage, Flashcard } from '../types';
 import { playCutePop, playCuteChime } from '../utils/sound';
+import aiRobotIcon from '../assets/images/ai_robot_avatar_icon_1789391582140.jpg';
 
 interface ChatbotViewProps {
   onAddFlashcard?: (card: Omit<Flashcard, 'id' | 'mastered'>) => void;
@@ -134,8 +135,13 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onAddFlashcard }) => {
         {/* Mascot badge */}
         <div className="flex items-center space-x-2.5">
           <div className="relative">
-            <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-[#ff6b81] to-[#ffa4b6] flex items-center justify-center text-white shadow-sm ring-2 ring-[#ffe4e6]">
-              <span className="text-xl">🐰</span>
+            <div className="w-11 h-11 rounded-2xl overflow-hidden shadow-sm ring-2 ring-[#ffe4e6] bg-[#fff0f3] flex items-center justify-center p-0.5">
+              <img
+                src={aiRobotIcon}
+                alt="AI Chatbot Robot Avatar"
+                referrerPolicy="no-referrer"
+                className="w-full h-full object-contain rounded-xl"
+              />
             </div>
             <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-emerald-500 ring-2 ring-white flex items-center justify-center text-[9px] text-white">
               ✓
@@ -217,8 +223,13 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({ onAddFlashcard }) => {
               }`}
             >
               {isBerry && (
-                <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[#ff6b81] to-[#ffa4b6] flex items-center justify-center text-white shrink-0 shadow-xs ring-1 ring-[#ffd4dc]">
-                  <span className="text-sm">🐰</span>
+                <div className="w-8 h-8 rounded-xl overflow-hidden shrink-0 shadow-xs ring-1 ring-[#ffd4dc] bg-[#fff0f3] flex items-center justify-center p-0.5">
+                  <img
+                    src={aiRobotIcon}
+                    alt="AI Chatbot"
+                    referrerPolicy="no-referrer"
+                    className="w-full h-full object-contain rounded-lg"
+                  />
                 </div>
               )}
 

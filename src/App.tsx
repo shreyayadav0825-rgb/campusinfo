@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ActiveTab, CalendarEvent, Flashcard, StudyNote, ResourceItem, TodoItem } from './types';
+import { ActiveTab, CalendarEvent, Flashcard, StudyNote, ResourceItem, TodoItem, ClassClash } from './types';
 import {
   INITIAL_CALENDAR_EVENTS,
   INITIAL_FLASHCARDS,
@@ -9,6 +9,7 @@ import {
   INITIAL_NOTION_PAGES,
   INITIAL_WHATSAPP_CHATS,
 } from './data/initialData';
+import { DEFAULT_CAMPUS_CLASHES } from './services/classClashService';
 import { AestheticNav } from './components/AestheticNav';
 import { NotepadCanvas } from './components/NotepadCanvas';
 import { AestheticHeader, GinghamTheme } from './components/AestheticHeader';
@@ -20,14 +21,20 @@ import { WhatsAppView } from './components/WhatsAppView';
 import { NotionView } from './components/NotionView';
 import { ResourcesView } from './components/ResourcesView';
 import { StudyMaterialView } from './components/StudyMaterialView';
+import { RedAlertBanner } from './components/RedAlertBanner';
+import { RedAlertModal } from './components/RedAlertModal';
+import { playCutePop, playRedAlertSound, stopRedAlertSound, resumeRedAlertSound } from './utils/sound';
+import { ShieldAlert, BellOff, CheckCircle2, RotateCcw, AlertTriangle, ShieldCheck } from 'lucide-react';
 import melodyCalIcon from './assets/images/melody_cal_icon_1789294067193.jpg';
 import todoIcon from './assets/images/todo_icon_1789300346730.jpg';
 import gmailIcon from './assets/images/strawberry_gmail_icon_1789301479320.jpg';
 import notionIcon from './assets/images/notion_icon_1789302061804.jpg';
 import whatsappIcon from './assets/images/whatsapp_icon_1789302930853.jpg';
+import booksResourcesIcon from './assets/images/books_resources_icon_1789391402505.jpg';
+import aiRobotIcon from './assets/images/ai_robot_avatar_icon_1789391582140.jpg';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<ActiveTab>('chat');
+  const [activeTab, setActiveTab] = useState<ActiveTab>('whatsapp');
   const [currentTheme, setTheme] = useState<GinghamTheme>('classic-red');
 
   // Application Data State
@@ -56,10 +63,35 @@ export default function App() {
     return saved ? JSON.parse(saved) : INITIAL_RESOURCES;
   });
 
+  // 🚨 Academic Class Clash State & Management
+  const [clashes, setClashes] = useState<ClassClash[]>(() => {
+    const saved = localStorage.getItem('academic_clashes');
+    return saved ? JSON.parse(saved) : DEFAULT_CAMPUS_CLASHES;
+  });
+
+  // 🛑 Option to stop/silence the Red Alert
+  const [isAlertStopped, setIsAlertStopped] = useState<boolean>(() => {
+    return localStorage.getItem('academic_red_alert_stopped') === 'true';
+  });
+
+  const [activeModalClash, setActiveModalClash] = useState<ClassClash | null>(null);
+  const [prefilledEmail, setPrefilledEmail] = useState<{ to: string; subject: string; body: string } | null>(null);
+
   // Local storage persistence
   useEffect(() => {
     localStorage.setItem('aesthetic_events', JSON.stringify(events));
   }, [events]);
+
+  useEffect(() => {
+    localStorage.setItem('academic_clashes', JSON.stringify(clashes));
+  }, [clashes]);
+
+  useEffect(() => {
+    localStorage.setItem('academic_red_alert_stopped', String(isAlertStopped));
+    if (isAlertStopped) {
+      stopRedAlertSound();
+    }
+  }, [isAlertStopped]);
 
   useEffect(() => {
     localStorage.setItem('aesthetic_flashcards', JSON.stringify(flashcards));
@@ -76,6 +108,92 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('aesthetic_todos', JSON.stringify(todos));
   }, [todos]);
+
+  // Red Alert triggers ONLY when two class timings in WhatsApp or Gmail clash and alert is NOT stopped
+  const unresolvedClashes = clashes.filter((c) => !c.resolved);
+  const activeClashes = isAlertStopped ? [] : unresolvedClashes;
+  const hasClashWhatsApp = !isAlertStopped && activeClashes.some((c) => c.source === 'whatsapp' || c.source === 'cross_service');
+  const hasClashGmail = !isAlertStopped && activeClashes.some((c) => c.source === 'gmail' || c.source === 'cross_service');
+
+  // Clash & Alert Handlers
+  const handleStopRedAlert = () => {
+    playCutePop();
+    stopRedAlertSound();
+    setIsAlertStopped(true);
+  };
+
+  const handleResumeRedAlert = () => {
+    playCutePop();
+    resumeRedAlertSound();
+    setIsAlertStopped(false);
+  };
+
+  const handleSetNonClashingTimings = () => {
+    playCutePop();
+    stopRedAlertSound();
+    // Timing separation: CHEM-204 is Wed 10:00 AM - 11:30 AM, HIST-110 is Wed 3:00 PM - 5:30 PM.
+    // No timing overlap! Alert is strictly NOT triggered.
+    setClashes([]);
+  };
+
+  const handleSetClashingTimings = () => {
+    playCutePop();
+    setIsAlertStopped(false);
+    resumeRedAlertSound();
+    setClashes(DEFAULT_CAMPUS_CLASHES.map((c) => ({ ...c, resolved: false })));
+    playRedAlertSound();
+  };
+
+  const handleOpenClash = (clash: ClassClash) => {
+    setActiveModalClash(clash);
+  };
+
+  const handleResolveClash = (clashId: string) => {
+    playCutePop();
+    setClashes((prev) =>
+      prev.map((c) => (c.id === clashId ? { ...c, resolved: true } : c))
+    );
+    if (activeModalClash?.id === clashId) {
+      setActiveModalClash(null);
+    }
+  };
+
+  const handleDismissClash = (clashId: string) => {
+    playCutePop();
+    setClashes((prev) => prev.filter((c) => c.id !== clashId));
+    if (activeModalClash?.id === clashId) {
+      setActiveModalClash(null);
+    }
+  };
+
+  const handleSimulateNewClash = () => {
+    handleSetClashingTimings();
+  };
+
+  const handleEmailProfessorFromClash = (clash: ClassClash) => {
+    playCutePop();
+    setPrefilledEmail({
+      to: 'Prof. David Vance <vance.biochem@campus.edu>',
+      subject: `Academic Schedule Conflict: ${clash.classA.className} & ${clash.classB.className}`,
+      body: `Dear Professor Vance,
+
+I am writing regarding the newly rescheduled ${clash.classA.className} on ${clash.classA.dayOrDate} from ${clash.classA.startTime} to ${clash.classA.endTime}.
+
+Unfortunately, I have an unavoidable academic conflict with my other enrolled course:
+• Conflicting Class: ${clash.classB.className}
+• Schedule: ${clash.classB.startTime} - ${clash.classB.endTime} (${clash.classB.locationOrRoom || 'Campus Classroom'})
+
+Both sessions require mandatory in-person attendance. Could I please arrange to complete the laboratory session during an alternate makeup section or during office hours?
+
+Thank you very much for your understanding and guidance.
+
+Sincerely,
+[Your Name]
+Student ID: #2026-CAMPUS`,
+    });
+    setActiveTab('gmail');
+    setActiveModalClash(null);
+  };
 
   // Handlers for To-Do List
   const handleAddTodo = (newTodo: Omit<TodoItem, 'id' | 'createdAt'>) => {
@@ -210,7 +328,16 @@ export default function App() {
   const getTabIcon = () => {
     switch (activeTab) {
       case 'chat':
-        return '🍓';
+        return (
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#fff0f2] border border-[#fecdd3] p-0.5 -mt-1 shadow-2xs">
+            <img
+              src={aiRobotIcon}
+              alt="AI Chatbot"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-xs"
+            />
+          </span>
+        );
       case 'calendar':
         return (
           <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#fff0f3] border border-[#fecdd3] p-0.5 -mt-1 shadow-2xs">
@@ -267,7 +394,16 @@ export default function App() {
           </span>
         );
       case 'resources':
-        return '🌿';
+        return (
+          <span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-[#e0f2fe] border border-[#bae6fd] p-0.5 -mt-1 shadow-2xs">
+            <img
+              src={booksResourcesIcon}
+              alt="Resources"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-xs"
+            />
+          </span>
+        );
       case 'study':
         return '🎴';
     }
@@ -289,8 +425,117 @@ export default function App() {
           eventCount={events.filter((e) => !e.completed).length}
           cardCount={flashcards.length}
           todoCount={todos.filter((t) => !t.completed).length}
+          hasClashWhatsApp={hasClashWhatsApp}
+          hasClashGmail={hasClashGmail}
         />
       </nav>
+
+      {/* 🛡️ Red Alert Controller & Clash Status Bar */}
+      <div className="max-w-4xl mx-auto w-full px-3 mb-2">
+        <div className="bg-white/85 backdrop-blur-xs rounded-2xl p-2.5 sm:px-4 sm:py-2 border border-[#fecdd3] shadow-xs flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2">
+            {isAlertStopped ? (
+              <span className="flex items-center gap-1.5 text-amber-800 font-bold bg-amber-50 border border-amber-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                <BellOff className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                <span>Red Alert Stopped & Silenced</span>
+              </span>
+            ) : unresolvedClashes.length > 0 ? (
+              <span className="flex items-center gap-1.5 text-red-800 font-bold bg-red-50 border border-red-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                <ShieldAlert className="w-3.5 h-3.5 text-red-600 animate-pulse shrink-0" />
+                <span>Red Alert Active: Class Timing Clash (Wed 3:00 PM)</span>
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-emerald-800 font-bold bg-emerald-50 border border-emerald-200 px-2.5 py-1 rounded-xl shadow-2xs">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                <span>Schedule Clear: No Class Timings Clash</span>
+              </span>
+            )}
+
+            <span className="text-[#64748b] hidden md:inline text-[11px]">
+              Only alerts when two class timings in WhatsApp or Gmail clash.
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {/* Stop / Resume Alert Button */}
+            {isAlertStopped ? (
+              <button
+                id="btn-resume-alert"
+                onClick={handleResumeRedAlert}
+                title="Resume monitoring for class timing clashes"
+                className="px-2.5 py-1 rounded-lg bg-[#f0fdf4] hover:bg-[#dcfce7] text-[#15803d] border border-[#86efac] font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+              >
+                <RotateCcw className="w-3 h-3" />
+                <span>Resume Alert</span>
+              </button>
+            ) : unresolvedClashes.length > 0 ? (
+              <button
+                id="btn-stop-alert-global"
+                onClick={handleStopRedAlert}
+                title="Stop and silence the Red Alert"
+                className="px-2.5 py-1 rounded-lg bg-[#fef2f2] hover:bg-[#fee2e2] text-[#b91c1c] border border-[#fca5a5] font-bold text-xs flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+              >
+                <BellOff className="w-3 h-3 text-red-600" />
+                <span>Stop Red Alert</span>
+              </button>
+            ) : null}
+
+            {/* Quick Timing Switchers to test the 'only alert when timings clash' requirement */}
+            {unresolvedClashes.length > 0 ? (
+              <button
+                onClick={handleSetNonClashingTimings}
+                title="Switch classes to non-overlapping times (Wed 10:00 AM vs Wed 3:00 PM)"
+                className="px-2 py-1 rounded-lg bg-[#f8fafc] hover:bg-[#f1f5f9] text-[#475569] border border-[#cbd5e1] text-[11px] font-medium flex items-center gap-1 transition-all cursor-pointer"
+              >
+                <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                <span>Set Non-Clashing Times</span>
+              </button>
+            ) : (
+              <button
+                onClick={handleSetClashingTimings}
+                title="Simulate class timings clashing on Wednesday at 3:00 PM"
+                className="px-2 py-1 rounded-lg bg-[#fef2f2] hover:bg-[#fee2e2] text-[#b91c1c] border border-[#fca5a5] text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+              >
+                <AlertTriangle className="w-3 h-3 text-red-500" />
+                <span>Test Clashing Timings</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* 🚨 Global RED ALERT Banner when clashes are detected */}
+      {activeClashes.length > 0 && (
+        <div className="max-w-4xl mx-auto w-full px-3 mb-2">
+          <RedAlertBanner
+            clashes={activeClashes}
+            onOpenClash={handleOpenClash}
+            onResolveClash={handleResolveClash}
+            onDismiss={handleDismissClash}
+            onStopAlert={handleStopRedAlert}
+            onNavigateToSource={(source) => {
+              if (source === 'gmail') setActiveTab('gmail');
+              else if (source === 'whatsapp') setActiveTab('whatsapp');
+            }}
+          />
+        </div>
+      )}
+
+      {/* 🚨 Detailed Clash Resolution Modal */}
+      {activeModalClash && (
+        <RedAlertModal
+          clash={activeModalClash}
+          isOpen={!!activeModalClash}
+          onClose={() => setActiveModalClash(null)}
+          onResolve={handleResolveClash}
+          onStopAlert={handleStopRedAlert}
+          onOpenEmailReply={(recipient, subject, bodyText) => {
+            setPrefilledEmail({ to: recipient, subject, body: bodyText });
+            setActiveTab('gmail');
+            setActiveModalClash(null);
+          }}
+        />
+      )}
 
       {/* Central Stationery Paper Card (Matching User Image) */}
       <main className="flex-1 flex items-center justify-center px-3 sm:px-6">
@@ -322,7 +567,15 @@ export default function App() {
           )}
 
           {activeTab === 'gmail' && (
-            <GmailView />
+            <GmailView
+              clashes={activeClashes}
+              onOpenClash={handleOpenClash}
+              onResolveClash={handleResolveClash}
+              onStopAlert={handleStopRedAlert}
+              onSimulateClash={handleSetClashingTimings}
+              prefilledEmail={prefilledEmail}
+              onClearPrefilledEmail={() => setPrefilledEmail(null)}
+            />
           )}
 
           {activeTab === 'whatsapp' && (
@@ -330,6 +583,11 @@ export default function App() {
               initialChats={INITIAL_WHATSAPP_CHATS}
               onAddTodo={handleAddTodo}
               onAddCalendarEvent={handleAddEvent}
+              clashes={activeClashes}
+              onOpenClash={handleOpenClash}
+              onResolveClash={handleResolveClash}
+              onStopAlert={handleStopRedAlert}
+              onSimulateClash={handleSetClashingTimings}
             />
           )}
 

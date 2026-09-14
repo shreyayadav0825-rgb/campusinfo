@@ -330,6 +330,17 @@ export const INITIAL_WHATSAPP_CHATS: WhatsAppChat[] = [
         deadlineMentioned: 'Friday Sep 18 at 11:59 PM',
         actionItem: 'Submit Lab Report Draft on GradeScope',
       },
+      {
+        id: 'msg-6',
+        sender: 'user-sophia',
+        senderName: 'Sophia Chen',
+        text: '🚨 URGENT NOTICE: Professor Vance rescheduled our CHEM-204 Makeup Lab Session to Wednesday 3:00 PM - 4:30 PM in Sci-Lab 201!',
+        timestamp: '10:45 AM',
+        isImportant: true,
+        priority: 'urgent',
+        deadlineMentioned: 'Wednesday 3:00 PM - 4:30 PM',
+        actionItem: 'Attend CHEM-204 Makeup Lab (Wednesday 3:00 PM - 4:30 PM)',
+      },
     ],
   },
   {

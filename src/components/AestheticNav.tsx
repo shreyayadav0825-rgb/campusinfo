@@ -7,6 +7,8 @@ import todoIcon from '../assets/images/todo_icon_1789300346730.jpg';
 import gmailIcon from '../assets/images/strawberry_gmail_icon_1789301479320.jpg';
 import notionIcon from '../assets/images/notion_icon_1789302061804.jpg';
 import whatsappIcon from '../assets/images/whatsapp_icon_1789302930853.jpg';
+import booksResourcesIcon from '../assets/images/books_resources_icon_1789391402505.jpg';
+import aiRobotIcon from '../assets/images/ai_robot_avatar_icon_1789391582140.jpg';
 
 interface AestheticNavProps {
   activeTab: ActiveTab;
@@ -14,6 +16,8 @@ interface AestheticNavProps {
   eventCount?: number;
   cardCount?: number;
   todoCount?: number;
+  hasClashWhatsApp?: boolean;
+  hasClashGmail?: boolean;
 }
 
 export const AestheticNav: React.FC<AestheticNavProps> = ({
@@ -22,6 +26,8 @@ export const AestheticNav: React.FC<AestheticNavProps> = ({
   eventCount = 0,
   cardCount = 0,
   todoCount = 0,
+  hasClashWhatsApp = false,
+  hasClashGmail = false,
 }) => {
   const tabs = [
     {
@@ -35,9 +41,13 @@ export const AestheticNav: React.FC<AestheticNavProps> = ({
       accentColor: '#ef4444',
       icon: (
         <div className="relative flex items-center justify-center">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#ff6b81] to-[#ffa4b6] flex items-center justify-center text-white shadow-sm ring-2 ring-[#ffe4e6]">
-            {/* Cute robot / bunny face with sparkle */}
-            <Bot className="w-5 h-5 drop-shadow-xs" />
+          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-sm ring-2 ring-[#ffe4e6] bg-[#fff0f3] flex items-center justify-center p-0.5">
+            <img
+              src={aiRobotIcon}
+              alt="AI Chatbot Robot Icon"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-xl"
+            />
           </div>
           <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#ec4899] text-[9px] font-bold text-white shadow-xs">
             ✨
@@ -98,15 +108,15 @@ export const AestheticNav: React.FC<AestheticNavProps> = ({
     {
       id: 'gmail' as ActiveTab,
       label: 'Gmail',
-      subtitle: 'Campus Inbox',
-      badge: 'Mail',
-      color: 'from-[#f43f5e] to-[#fb7185]',
-      activeBg: 'bg-[#fff1f2] border-[#f43f5e] text-[#9f1239]',
+      subtitle: hasClashGmail ? '🚨 Clash Alert' : 'Campus Inbox',
+      badge: hasClashGmail ? '🚨 RED ALERT' : 'Mail',
+      color: hasClashGmail ? 'from-[#dc2626] to-[#ef4444]' : 'from-[#f43f5e] to-[#fb7185]',
+      activeBg: hasClashGmail ? 'bg-[#fef2f2] border-[#dc2626] text-[#991b1b]' : 'bg-[#fff1f2] border-[#f43f5e] text-[#9f1239]',
       hoverBg: 'hover:bg-[#fff5f6]',
-      accentColor: '#f43f5e',
+      accentColor: hasClashGmail ? '#dc2626' : '#f43f5e',
       icon: (
         <div className="relative flex items-center justify-center">
-          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-sm ring-2 ring-[#fecdd3] bg-[#fff0f3] flex items-center justify-center p-0.5">
+          <div className={`w-10 h-10 rounded-2xl overflow-hidden shadow-sm ring-2 ${hasClashGmail ? 'ring-red-400 animate-pulse' : 'ring-[#fecdd3]'} bg-[#fff0f3] flex items-center justify-center p-0.5`}>
             <img
               src={gmailIcon}
               alt="Gmail Icon"
@@ -114,8 +124,8 @@ export const AestheticNav: React.FC<AestheticNavProps> = ({
               className="w-full h-full object-contain rounded-xl"
             />
           </div>
-          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#f43f5e] text-[9px] font-bold text-white shadow-xs">
-            ✉
+          <span className={`absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full ${hasClashGmail ? 'bg-red-600 animate-ping' : 'bg-[#f43f5e]'} text-[9px] font-bold text-white shadow-xs`}>
+            {hasClashGmail ? '!' : '✉'}
           </span>
         </div>
       ),
@@ -123,15 +133,15 @@ export const AestheticNav: React.FC<AestheticNavProps> = ({
     {
       id: 'whatsapp' as ActiveTab,
       label: 'WhatsApp',
-      subtitle: 'Squad & Circles',
-      badge: 'AI Brief',
-      color: 'from-[#16a34a] to-[#22c55e]',
-      activeBg: 'bg-[#f0fdf4] border-[#16a34a] text-[#14532d]',
+      subtitle: hasClashWhatsApp ? '🚨 Clash Alert' : 'Squad & Circles',
+      badge: hasClashWhatsApp ? '🚨 RED ALERT' : 'AI Brief',
+      color: hasClashWhatsApp ? 'from-[#dc2626] to-[#ef4444]' : 'from-[#16a34a] to-[#22c55e]',
+      activeBg: hasClashWhatsApp ? 'bg-[#fef2f2] border-[#dc2626] text-[#991b1b]' : 'bg-[#f0fdf4] border-[#16a34a] text-[#14532d]',
       hoverBg: 'hover:bg-[#f7fee7]',
-      accentColor: '#16a34a',
+      accentColor: hasClashWhatsApp ? '#dc2626' : '#16a34a',
       icon: (
         <div className="relative flex items-center justify-center">
-          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-sm ring-2 ring-[#86efac] bg-[#f0fdf4] flex items-center justify-center p-0.5">
+          <div className={`w-10 h-10 rounded-2xl overflow-hidden shadow-sm ring-2 ${hasClashWhatsApp ? 'ring-red-400 animate-pulse' : 'ring-[#86efac]'} bg-[#f0fdf4] flex items-center justify-center p-0.5`}>
             <img
               src={whatsappIcon}
               alt="WhatsApp Icon"
@@ -139,8 +149,8 @@ export const AestheticNav: React.FC<AestheticNavProps> = ({
               className="w-full h-full object-contain rounded-xl"
             />
           </div>
-          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#16a34a] text-[9px] font-bold text-white shadow-xs">
-            💬
+          <span className={`absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full ${hasClashWhatsApp ? 'bg-red-600 animate-ping' : 'bg-[#16a34a]'} text-[9px] font-bold text-white shadow-xs`}>
+            {hasClashWhatsApp ? '!' : '💬'}
           </span>
         </div>
       ),
@@ -175,17 +185,22 @@ export const AestheticNav: React.FC<AestheticNavProps> = ({
       label: 'Resources',
       subtitle: 'Links & Tools',
       badge: 'Library',
-      color: 'from-[#10b981] to-[#34d399]',
-      activeBg: 'bg-[#f0fdf4] border-[#10b981] text-[#065f46]',
-      hoverBg: 'hover:bg-[#f7fee7]',
-      accentColor: '#10b981',
+      color: 'from-[#0ea5e9] to-[#38bdf8]',
+      activeBg: 'bg-[#f0f9ff] border-[#0ea5e9] text-[#0369a1]',
+      hoverBg: 'hover:bg-[#f0fdf4]',
+      accentColor: '#0ea5e9',
       icon: (
         <div className="relative flex items-center justify-center">
-          <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-[#059669] to-[#6ee7b7] flex items-center justify-center text-white shadow-sm ring-2 ring-[#d1fae5]">
-            <BookMarked className="w-5 h-5 drop-shadow-xs" />
+          <div className="w-10 h-10 rounded-2xl overflow-hidden shadow-sm ring-2 ring-[#bae6fd] bg-[#e0f2fe] flex items-center justify-center p-0.5">
+            <img
+              src={booksResourcesIcon}
+              alt="Resources Books Icon"
+              referrerPolicy="no-referrer"
+              className="w-full h-full object-contain rounded-xl"
+            />
           </div>
-          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#0d9488] text-[9px] font-bold text-white shadow-xs">
-            ★
+          <span className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-[#ec4899] text-[9px] font-bold text-white shadow-xs">
+            ♥
           </span>
         </div>
       ),

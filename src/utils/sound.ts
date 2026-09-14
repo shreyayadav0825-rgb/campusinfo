@@ -89,3 +89,75 @@ export function playCardFlip() {
     // Gracefully ignore
   }
 }
+
+let activeAlertOscillators: OscillatorNode[] = [];
+let isRedAlertSoundMuted = false;
+
+export function stopRedAlertSound() {
+  try {
+    isRedAlertSoundMuted = true;
+    activeAlertOscillators.forEach((osc) => {
+      try {
+        osc.stop();
+        osc.disconnect();
+      } catch {
+        // Already stopped
+      }
+    });
+    activeAlertOscillators = [];
+  } catch {
+    // Gracefully ignore
+  }
+}
+
+export function resumeRedAlertSound() {
+  isRedAlertSoundMuted = false;
+}
+
+export function playRedAlertSound() {
+  if (isRedAlertSoundMuted) return;
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+
+    // Stop any existing alert sounds first
+    activeAlertOscillators.forEach((osc) => {
+      try {
+        osc.stop();
+        osc.disconnect();
+      } catch {}
+    });
+    activeAlertOscillators = [];
+
+    // Dual emergency warning beep (880Hz and 660Hz)
+    const tones = [
+      { freq: 880, start: 0, dur: 0.12 },
+      { freq: 659.25, start: 0.14, dur: 0.14 },
+      { freq: 880, start: 0.32, dur: 0.15 },
+    ];
+
+    tones.forEach(({ freq, start, dur }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sawtooth";
+      osc.frequency.setValueAtTime(freq, ctx.currentTime + start);
+
+      gain.gain.setValueAtTime(0.15, ctx.currentTime + start);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + start + dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(ctx.currentTime + start);
+      osc.stop(ctx.currentTime + start + dur);
+
+      activeAlertOscillators.push(osc);
+      osc.onended = () => {
+        activeAlertOscillators = activeAlertOscillators.filter((o) => o !== osc);
+      };
+    });
+  } catch {
+    // Gracefully ignore
+  }
+}

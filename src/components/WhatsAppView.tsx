@@ -6,9 +6,10 @@ import {
   WhatsAppGroupCategory,
   TodoItem,
   CalendarEvent,
+  ClassClash,
 } from '../types';
 import { summarizeWhatsAppChat, parseWhatsAppExport } from '../services/whatsappService';
-import { playCutePop } from '../utils/sound';
+import { playCutePop, playRedAlertSound, stopRedAlertSound } from '../utils/sound';
 import {
   MessageSquare,
   Sparkles,
@@ -35,6 +36,9 @@ import {
   PlusCircle,
   Tag,
   ShieldAlert,
+  AlertOctagon,
+  Volume2,
+  BellOff,
 } from 'lucide-react';
 import whatsappIcon from '../assets/images/whatsapp_icon_1789302930853.jpg';
 
@@ -42,6 +46,11 @@ interface WhatsAppViewProps {
   initialChats: WhatsAppChat[];
   onAddTodo?: (todo: Omit<TodoItem, 'id' | 'createdAt'>) => void;
   onAddCalendarEvent?: (event: Omit<CalendarEvent, 'id'>) => void;
+  clashes?: ClassClash[];
+  onOpenClash?: (clash: ClassClash) => void;
+  onResolveClash?: (clashId: string) => void;
+  onStopAlert?: () => void;
+  onSimulateClash?: () => void;
 }
 
 type ModalMode = 'class' | 'club' | null;
@@ -50,6 +59,11 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
   initialChats,
   onAddTodo,
   onAddCalendarEvent,
+  clashes = [],
+  onOpenClash,
+  onResolveClash,
+  onStopAlert,
+  onSimulateClash,
 }) => {
   const [chats, setChats] = useState<WhatsAppChat[]>(() => {
     const saved = localStorage.getItem('aesthetic_whatsapp_chats');
@@ -87,6 +101,19 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
 
   const selectedChat = chats.find((c) => c.id === selectedChatId) || chats[0];
   const activeSummary = selectedChat ? summaries[selectedChat.id] : null;
+
+  // Active clashes involving WhatsApp
+  const activeClashes = clashes.filter((c) => !c.resolved);
+  const relevantClash = activeClashes.find((c) => {
+    if (!selectedChat) return false;
+    return (
+      c.classA.chatId === selectedChat.id ||
+      c.classB.chatId === selectedChat.id ||
+      c.classA.courseCode === selectedChat.courseCode ||
+      c.classB.courseCode === selectedChat.courseCode ||
+      c.source === 'whatsapp'
+    );
+  }) || (activeClashes.length > 0 ? activeClashes[0] : null);
 
   useEffect(() => {
     localStorage.setItem('aesthetic_whatsapp_chats', JSON.stringify(chats));
@@ -381,6 +408,19 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
 
         {/* Action Controls: Distinct Options to Add Class Group vs Club/Society Group */}
         <div className="flex flex-wrap items-center gap-2 w-full xl:w-auto justify-start xl:justify-end">
+          {/* Option: Test / Trigger Class Clash */}
+          <button
+            onClick={() => {
+              playRedAlertSound();
+              if (onSimulateClash) onSimulateClash();
+            }}
+            className="bg-red-50 hover:bg-red-100 text-[#b91c1c] border-2 border-red-200 hover:border-red-400 px-3 py-2 rounded-xl text-xs font-bold shadow-2xs transition-all flex items-center gap-1.5 cursor-pointer"
+            title="Test or trigger Class Clash Red Alert"
+          >
+            <ShieldAlert className="w-3.5 h-3.5 text-red-600 animate-pulse" />
+            <span>🚨 Test Clash Alert</span>
+          </button>
+
           {/* Option 1: Add Class Group */}
           <button
             onClick={() => handleOpenModal('class')}
@@ -511,6 +551,14 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
                   const isClass = chat.category === 'class';
                   const isClub = chat.category === 'club';
 
+                  const chatClash = activeClashes.find(
+                    (c) =>
+                      c.classA.chatId === chat.id ||
+                      c.classB.chatId === chat.id ||
+                      c.classA.courseCode === chat.courseCode ||
+                      c.classB.courseCode === chat.courseCode
+                  );
+
                   return (
                     <button
                       key={chat.id}
@@ -520,7 +568,11 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
                       }}
                       className={`w-full text-left p-2.5 rounded-xl transition-all duration-200 flex items-center justify-between gap-2.5 cursor-pointer ${
                         isSelected
-                          ? 'bg-[#ecfdf5] border border-[#86efac] text-[#065f46] shadow-2xs'
+                          ? chatClash
+                            ? 'bg-[#fef2f2] border-2 border-red-500 text-[#991b1b] shadow-xs'
+                            : 'bg-[#ecfdf5] border border-[#86efac] text-[#065f46] shadow-2xs'
+                          : chatClash
+                          ? 'bg-red-50/60 hover:bg-red-50 border border-red-200 text-[#991b1b]'
                           : 'hover:bg-[#f0fdf4] text-[#334155] border border-transparent'
                       }`}
                     >
@@ -533,7 +585,12 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
                             <h4 className="text-xs font-bold truncate">
                               {chat.chatName}
                             </h4>
-                            {isClass && (
+                            {chatClash && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-red-600 text-white font-black shrink-0 animate-pulse flex items-center gap-0.5 shadow-2xs">
+                                🚨 CLASH
+                              </span>
+                            )}
+                            {isClass && !chatClash && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-[#e0f2fe] text-[#0369a1] font-semibold shrink-0">
                                 {chat.courseCode || 'Class'}
                               </span>
@@ -653,6 +710,85 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
                 </div>
               ) : activeSummary ? (
                 <div className="space-y-3.5">
+                  {/* 🚨 RED ALERT: Class Schedule Clash Detected in WhatsApp Summary */}
+                  {relevantClash && !relevantClash.resolved && (
+                    <div className="bg-gradient-to-r from-[#991b1b] via-[#dc2626] to-[#b91c1c] text-white p-3.5 sm:p-4 rounded-2xl shadow-md border-2 border-red-800 animate-in fade-in space-y-2.5">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-9 h-9 rounded-xl bg-white/20 border border-white/40 flex items-center justify-center animate-pulse shrink-0">
+                            <ShieldAlert className="w-5 h-5 text-white" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <span className="bg-white text-[#991b1b] text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shadow-2xs">
+                                🚨 RED ALERT: CLASS CLASH DETECTED
+                              </span>
+                              <span className="text-[11px] text-red-100 font-medium">
+                                Academic Conflict
+                              </span>
+                            </div>
+                            <h4 className="text-xs sm:text-sm font-bold text-white mt-1">
+                              {relevantClash.classA.className} conflicts with {relevantClash.classB.className}
+                            </h4>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center space-x-2 shrink-0 self-end sm:self-auto">
+                          <button
+                            onClick={() => {
+                              playRedAlertSound();
+                            }}
+                            title="Play Alert Tone"
+                            className="p-1.5 rounded-lg bg-white/15 hover:bg-white/25 text-white transition-colors cursor-pointer"
+                          >
+                            <Volume2 className="w-4 h-4" />
+                          </button>
+
+                          <button
+                            id="wa-stop-alert-btn"
+                            onClick={() => {
+                              playCutePop();
+                              stopRedAlertSound();
+                              if (onStopAlert) {
+                                onStopAlert();
+                              } else if (onResolveClash) {
+                                onResolveClash(relevantClash.id);
+                              }
+                            }}
+                            title="Stop Red Alert"
+                            className="bg-black/35 hover:bg-black/55 text-white border border-white/30 text-xs font-bold px-3 py-1.5 rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <BellOff className="w-3.5 h-3.5 text-yellow-300" />
+                            <span>Stop Alert</span>
+                          </button>
+
+                          <button
+                            onClick={() => {
+                              playCutePop();
+                              if (onOpenClash) onOpenClash(relevantClash);
+                            }}
+                            className="bg-white hover:bg-red-50 text-[#b91c1c] text-xs font-bold px-3.5 py-1.5 rounded-xl shadow-xs hover:shadow-md transition-all flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <span>Resolve Conflict</span>
+                            <ArrowRight className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="bg-black/25 rounded-xl p-2.5 text-[11px] text-red-100 flex flex-col sm:flex-row sm:items-center justify-between gap-1 border border-white/10">
+                        <div className="flex items-center gap-1.5">
+                          <AlertOctagon className="w-3.5 h-3.5 text-yellow-300 shrink-0" />
+                          <span>
+                            <strong className="text-white">{relevantClash.overlapDescription}</strong>
+                          </span>
+                        </div>
+                        <span className="text-[10px] text-red-200">
+                          Announced via WhatsApp group & Campus Schedule
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Overview statement */}
                   <p className="text-xs text-[#14532d] leading-relaxed font-medium bg-white/70 p-3 rounded-xl border border-[#bbf7d0]/60">
                     {activeSummary.overview}
@@ -842,6 +978,29 @@ export const WhatsAppView: React.FC<WhatsAppViewProps> = ({
                         )}
 
                         <p className="whitespace-pre-wrap">{msg.text}</p>
+
+                        {/* 🚨 Red Alert Warning in message if clashing schedule is mentioned */}
+                        {(msg.text.includes('CHEM-204 Makeup Lab') ||
+                          msg.text.includes('3:00 PM - 4:30 PM') ||
+                          msg.text.includes('3:00 PM to 5:30 PM')) &&
+                          relevantClash &&
+                          !relevantClash.resolved && (
+                            <div className="mt-2 p-2 bg-red-100/95 border-2 border-red-400 rounded-xl text-[10px] text-red-900 font-bold flex items-center justify-between gap-1 shadow-xs">
+                              <span className="flex items-center gap-1.5">
+                                <ShieldAlert className="w-3.5 h-3.5 text-red-600 animate-pulse shrink-0" />
+                                <span>🚨 Clashes with {relevantClash.classB.className} (Wed 3:00 PM)!</span>
+                              </span>
+                              <button
+                                onClick={() => {
+                                  playCutePop();
+                                  if (onOpenClash) onOpenClash(relevantClash);
+                                }}
+                                className="bg-red-600 hover:bg-red-700 text-white px-2 py-0.5 rounded-lg text-[9px] font-black uppercase cursor-pointer"
+                              >
+                                Resolve
+                              </button>
+                            </div>
+                          )}
 
                         {/* Action buttons if action item or deadline detected */}
                         {(msg.actionItem || msg.deadlineMentioned) && (
